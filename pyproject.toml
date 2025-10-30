@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gadopt_demo_utils"
+version = "0.0.1"
 authors = [
   { name = "G-ADOPT Contributors" }
 ]
 description = "Demo utilites for G-ADOPT"
-dynamic = ["version"]
 readme = "README.md"
 classifiers = [
   "Programming Language :: Python :: 3",
