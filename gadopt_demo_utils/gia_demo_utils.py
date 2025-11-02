@@ -69,6 +69,7 @@ def ice_sheet_disc(
 def make_ice_ring(
         reader: PVDReader,
         domain_depth: float = 2891e3,
+        scalar='Ice thickness',
 ) -> PolyData:
     """Create a ring of ice thickness outside an annulus domain
 
@@ -83,7 +84,7 @@ def make_ice_ring(
     """
 
     data = reader.read()[0]
-    data['Ice thickness'] *= domain_depth  # Convert ice thickness to m
+    data[scalar] *= domain_depth  # Convert ice thickness to m
 
     # Isolate data on surface of sphere
     surf = data.extract_feature_edges(boundary_edges=True, non_manifold_edges=False,
@@ -107,7 +108,11 @@ def make_ice_ring(
 def plot_ice_ring(
         plotter: Plotter,
         fname: str = 'ice.pvd',
-        scalar: str = "Ice thickness"):
+        scalar: str = "Ice thickness",
+        scalar_bar_x: float = 0.05,
+        scalar_bar_y: float = 0.3,
+        scalar_bar_vertical: bool = True,
+        show_scalar_bar: bool = True):
     """Add an ice ring to Pyvista plot
 
     Args:
@@ -119,7 +124,7 @@ def plot_ice_ring(
         Name of scalar field to plot
     """
     ice_reader = pv.get_reader(fname)
-    ice_ring = make_ice_ring(ice_reader)
+    ice_ring = make_ice_ring(ice_reader, scalar=scalar)
     ice_cmap = plt.get_cmap("Blues", 25)
     ice_lw = 20
 
@@ -136,21 +141,26 @@ def plot_ice_ring(
         clim=[0, 2000],
         scalar_bar_args={
             "title": 'Ice thickness (m)',
-            "position_x": 0.05,
-            "position_y": 0.3,
-            "vertical": True,
+            "position_x": scalar_bar_x,
+            "position_y": scalar_bar_y,
+            "vertical": scalar_bar_vertical,
             "title_font_size": 20,
             "label_font_size": 16,
             "fmt": "%.0f",
             "font_family": "arial",
-        }
+        },
+        show_scalar_bar=show_scalar_bar,
     )
 
 
 def plot_viscosity(
         plotter: Plotter,
         fname: str = 'viscosity.pvd',
-        viscosity_scale: float = 1e21):
+        viscosity_scale: float = 1e21,
+        scalar_bar_x: float = 0.8,
+        scalar_bar_y: float = 0.3,
+        scalar_bar_vertical: bool = True,
+        show_scalar_bar=True):
     """Add viscosity field to Pyvista plot
 
     Args:
@@ -183,16 +193,16 @@ def plot_viscosity(
         log_scale=True,
         scalar_bar_args={
             "title": 'Viscosity (Pa s)',
-            "position_x": 0.8,
-            "position_y": 0.3,
-            "vertical": True,
+            "position_x": scalar_bar_x,
+            "position_y": scalar_bar_y,
+            "vertical": scalar_bar_vertical,
             "title_font_size": 20,
             "label_font_size": 16,
             "fmt": "%.0e",
             "font_family": "arial",
             "n_labels": 6,
         },
-        show_scalar_bar=True
+        show_scalar_bar=show_scalar_bar,
     )
 
 
@@ -282,3 +292,108 @@ def plot_animation(
                 plotter.write_frame()
 
         plotter.clear()
+
+
+def plot_displacement(
+        plotter: Plotter,
+        fname: str = 'output.pvd',
+        disp='displacement',
+        vel='velocity',
+        domain_depth: float = 2891e3,
+        output_step=10,
+        scalar_bar_x: float = 0.85,
+        show_scalar_bar=True):
+    """Add viscosity field to Pyvista plot
+
+    Args:
+      plotter:
+        Pyvista plotter
+      fname:
+        Name of VTK pvd file to read input data from
+      viscosity_scale:
+        Characteristic viscosity scale used to re-dimensionalise the viscosity field
+    """
+    reader = pv.get_reader(fname)
+    data = reader.read()[0]
+    # Artificially warp the output data by the displacement
+    # Note the mesh is not really moving!
+    warped = data.warp_by_vector(vectors=disp, factor=1500)
+    arrows = warped.glyph(orient=vel, scale=vel, factor=5e4, tolerance=0.01)
+    plotter.add_mesh(arrows, color="grey", lighting=False)
+    data[disp] *= domain_depth  # Convert displacement to m
+    inferno_cmap = plt.get_cmap("inferno_r", 25)
+    # Add the warped displacement field to the frame
+    plotter.add_mesh(
+        warped,
+        scalars=disp,
+        component=None,
+        lighting=False,
+        clim=[0, 600],
+        cmap=inferno_cmap,
+        scalar_bar_args={
+            "title": 'Displacement (m)',
+            "position_x": scalar_bar_x,
+            "position_y": 0.3,
+            "vertical": True,
+            "title_font_size": 20,
+            "label_font_size": 16,
+            "fmt": "%.0f",
+            "font_family": "arial",
+        },
+        show_scalar_bar=True,
+    )
+
+
+def plot_adj_ring(
+        plotter: Plotter,
+        fname: str = 'adj_ice.pvd',
+        scalar: str = "Ice thickness",
+        stretch: float = 1.15,
+        scalar_bar_x: float = 0.8,
+        scalar_bar_y: float = 0.3,
+        scalar_bar_vertical: bool = True,
+        show_scalar_bar=True):
+    """Add an ice ring to Pyvista plot
+
+    Args:
+      plotter:
+        Pyvista plotter
+      fname:
+        Name of VTK pvd file to read input data from
+      scalar:
+        Name of scalar field to plot
+    """
+    reader = pv.get_reader(fname)
+    data = reader.read()[0]
+    # Stretch so that ring appears outside computational domain
+    transform_matrix = np.array(
+        [
+            [stretch, 0, 0, 0],
+            [0, stretch, 0, 0],
+            [0, 0, stretch, 0],
+            [0, 0, 0, 1],
+        ])
+    transformed_surf = data.transform(transform_matrix, inplace=True)
+    ice_lw = 20
+
+    # add outline of ice ring
+    plotter.add_mesh(transformed_surf, color='black', line_width=ice_lw+2, lighting=False,
+                     show_scalar_bar=False)
+    adj_cmap = plt.get_cmap("coolwarm", 25)
+    # plot ice ring
+    plotter.add_mesh(
+        transformed_surf,
+        line_width=ice_lw,
+        cmap=adj_cmap,
+        clim=[-0.5, 0.5],
+        scalar_bar_args={
+            "title": 'Adjoint sensitivity',
+            "position_x": 0.05,
+            "position_y": 0.3,
+            "vertical": True,
+            "title_font_size": 20,
+            "label_font_size": 16,
+            "fmt": "%.2f",
+            "font_family": "arial",
+        }
+    )
