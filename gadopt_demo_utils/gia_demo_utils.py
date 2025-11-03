@@ -155,11 +155,9 @@ def plot_ice_ring(
         show_scalar_bar=show_scalar_bar,
     )
 
-
-def plot_viscosity(
+def plot_adj_viscosity(
         plotter: Plotter,
-        fname: str = 'viscosity.pvd',
-        viscosity_scale: float = 1e21,
+        fname: str = 'adj_visc.pvd',
         scalar_bar_x: float = 0.8,
         scalar_bar_y: float = 0.3,
         scalar_bar_vertical: bool = True,
@@ -176,7 +174,61 @@ def plot_viscosity(
     """
     reader = pv.get_reader(fname)
     data = reader.read()[0]
-    data['viscosity'] *= viscosity_scale  # Convert viscosity to Pa s
+
+    # add outline of domain
+    surf = data.extract_feature_edges(boundary_edges=True, non_manifold_edges=False,
+                                      feature_edges=False, manifold_edges=False)
+    plotter.add_mesh(surf, color='black', line_width=lw,
+                     lighting=False, show_scalar_bar=False)
+
+    adj_cmap = plt.get_cmap("coolwarm", 25)
+
+    plotter.add_mesh(
+        data,
+        component=None,
+        lighting=False,
+        show_edges=False,
+        cmap=adj_cmap,
+        clim=[-0.1, 0.1],
+        scalar_bar_args={
+            "title": 'Adjoint sensitivity',
+            "position_x": scalar_bar_x,
+            "position_y": scalar_bar_y,
+            "vertical": scalar_bar_vertical,
+            "title_font_size": 20,
+            "label_font_size": 16,
+            "fmt": "%.0e",
+            "font_family": "arial",
+            "n_labels": 6,
+        },
+        show_scalar_bar=show_scalar_bar,
+    )
+
+
+def plot_viscosity(
+        plotter: Plotter,
+        fname: str = 'viscosity.pvd',
+        scalar: str = 'viscosity',
+        viscosity_scale: float = 1e21,
+        scalar_bar_x: float = 0.8,
+        scalar_bar_y: float = 0.3,
+        scalar_bar_vertical: bool = True,
+        show_scalar_bar=True,
+        timestep: int = 0):
+    """Add viscosity field to Pyvista plot
+
+    Args:
+      plotter:
+        Pyvista plotter
+      fname:
+        Name of VTK pvd file to read input data from
+      viscosity_scale:
+        Characteristic viscosity scale used to re-dimensionalise the viscosity field
+    """
+    reader = pv.get_reader(fname)
+    reader.set_active_time_point(timestep)
+    data = reader.read()[0]
+    data[scalar] *= viscosity_scale  # Convert viscosity to Pa s
 
     # add outline of domain
     surf = data.extract_feature_edges(boundary_edges=True, non_manifold_edges=False,
@@ -188,6 +240,7 @@ def plot_viscosity(
 
     plotter.add_mesh(
         data,
+        scalars=scalar,
         component=None,
         lighting=False,
         show_edges=False,
