@@ -68,7 +68,7 @@ def ice_sheet_disc(
 
 def make_ice_ring(
         reader: PVDReader,
-        domain_depth: float = 2891e3,
+        thickness_scale: float = 2891e3,
         scalar='Ice thickness',
 ) -> PolyData:
     """Create a ring of ice thickness outside an annulus domain
@@ -76,15 +76,15 @@ def make_ice_ring(
     Args:
       reader:
         Pyvista reader that contains ice thickness data
-      domain_depth:
-        Depth of domain in m used to re-dimensionalise ice thickness
+      thickness_scale:
+        Thickness in m used to re-dimensionalise ice thickness
 
     Returns:
       Ice thickness transformed to surface mesh
     """
 
     data = reader.read()[0]
-    data[scalar] *= domain_depth  # Convert ice thickness to m
+    data[scalar] *= thickness_scale  # Convert ice thickness to m
 
     # Isolate data on surface of sphere
     surf = data.extract_feature_edges(boundary_edges=True, non_manifold_edges=False,
@@ -112,7 +112,9 @@ def plot_ice_ring(
         scalar_bar_x: float = 0.05,
         scalar_bar_y: float = 0.3,
         scalar_bar_vertical: bool = True,
-        show_scalar_bar: bool = True):
+        show_scalar_bar: bool = True,
+        thickness_scale: float = 2891e3,
+        timestep: int =0):
     """Add an ice ring to Pyvista plot
 
     Args:
@@ -124,7 +126,8 @@ def plot_ice_ring(
         Name of scalar field to plot
     """
     ice_reader = pv.get_reader(fname)
-    ice_ring = make_ice_ring(ice_reader, scalar=scalar)
+    ice_reader.set_active_time_point(timestep)
+    ice_ring = make_ice_ring(ice_reader, scalar=scalar, thickness_scale=thickness_scale)
     ice_cmap = plt.get_cmap("Blues", 25)
     ice_lw = 20
 
@@ -300,7 +303,7 @@ def plot_displacement(
         disp='displacement',
         vel='velocity',
         domain_depth: float = 2891e3,
-        output_step=10,
+        timestep: int = 0,
         scalar_bar_x: float = 0.85,
         show_scalar_bar=True):
     """Add viscosity field to Pyvista plot
@@ -314,6 +317,7 @@ def plot_displacement(
         Characteristic viscosity scale used to re-dimensionalise the viscosity field
     """
     reader = pv.get_reader(fname)
+    reader.set_active_time_point(timestep)
     data = reader.read()[0]
     # Artificially warp the output data by the displacement
     # Note the mesh is not really moving!
