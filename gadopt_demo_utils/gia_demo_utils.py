@@ -388,9 +388,9 @@ def plot_adj_ring(
         clim=[-0.5, 0.5],
         scalar_bar_args={
             "title": 'Adjoint sensitivity',
-            "position_x": 0.05,
-            "position_y": 0.3,
-            "vertical": True,
+            "position_x": scalar_bar_x,
+            "position_y": scalar_bar_y,
+            "vertical": scalar_bar_vertical,
             "title_font_size": 20,
             "label_font_size": 16,
             "fmt": "%.2f",
